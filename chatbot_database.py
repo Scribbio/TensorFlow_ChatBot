@@ -11,8 +11,8 @@ sql_transaction = []
 start_row = 0
 cleanup = 100000
 
-keyword_counterNew = 0
-keyword_counterOld = 0
+# keyword_counterNew = 0
+# keyword_counterOld = 0
 
 connection = sqlite3.connect('{}.db'.format(timeframe))
 c = connection.cursor()
@@ -24,16 +24,19 @@ c = connection.cursor()
 #             'welcome', 'how have you been?', 'yo!', 'are you OK?', 'you alright?', 'alright mate?', 'howdy!', 'sup?',
 #             'whazzup?', 'whassup', 'what’s up', 'hiya!', ,
 
-keywords = ['Hey ', 'Hello ', 'Hi ' 'how’s it going?', 'how are you doing?', 'what’s up?', 'what’s new?', 'what’s going on?',
+keywords = ['how are you?', 'how’s it going?', 'how are you doing?', 'what’s up?', 'what’s new?'
+            'what’s going on?',
             ' atmosphere', ' clear sky', ' climate', ' cold', ' cyclone', ' fog',
             ' humidity', ' humid', ' precipitation', ' prevailing wind', 'rain ', ' rainfall', ' summer', ' winter', ' autumn', 'spring', 'seasonality',
-            'smog ', ' sunny', ' snow', ' snowflakes', ' snowflakes', ' snowstorm ', ' temperature', ' temperature range', ' warm front', ' warm sector', ' warmer', ' weather',
-            ' wind ', ' windy ']
+            'smog ', ' sunny', ' snow', ' snowflakes', ' snowflakes', ' snowstorm ', ' temperature', ' temperature range', ' warm front', ' warm sector',
+            ' warmer', ' weather', ' wind ', ' windy ', 'drizzle', 'downpour', 'freezing', 'cloudy', 'overcast', 'hurricane', ' drought', 'thunder', 'met office',
+            'meteorology', 'rainstorm', 'cloudless', 'tsunami', 'tornado']
 
 def create_table():
     c.execute(
         #Name of table - parent reply
-        "CREATE TABLE IF NOT EXISTS parent_reply(parent_id TEXT PRIMARY KEY, comment_id TEXT UNIQUE, parent TEXT, comment TEXT, subreddit TEXT, unix INT, score INT)")
+        "CREATE TABLE IF NOT EXISTS parent_reply(parent_id TEXT PRIMARY KEY, comment_id TEXT UNIQUE, parent TEXT, "
+        "comment TEXT, subreddit TEXT, unix INT, score INT, keyword_score INT)")
 
 
 def format_data(data):
@@ -55,28 +58,28 @@ def transaction_bldr(sql):
         sql_transaction = []
 
 
-def sql_insert_replace_comment(commentid, parentid, parent, comment, subreddit, time, score):
+def sql_insert_replace_comment(commentid, parentid, parent, comment, subreddit, time, score, keyword_score):
     try:
-        sql = """UPDATE parent_reply SET parent_id = ?, comment_id = ?, parent = ?, comment = ?, subreddit = ?, unix = ?, score = ? WHERE parent_id =?;""".format(
-            parentid, commentid, parent, comment, subreddit, int(time), score, parentid)
+        sql = """UPDATE parent_reply SET parent_id = ?, comment_id = ?, parent = ?, comment = ?, subreddit = ?, unix = ?, score = ?, keyword_score = ?, WHERE parent_id =?;""".format(
+            parentid, commentid, parent, comment, subreddit, int(time), score, keyword_score, parentid)
         transaction_bldr(sql)
     except Exception as e:
         print('s0 insertion', str(e))
 
 
-def sql_insert_has_parent(commentid, parentid, parent, comment, subreddit, time, score):
+def sql_insert_has_parent(commentid, parentid, parent, comment, subreddit, time, score, keywordsCount):
     try:
-        sql = """INSERT INTO parent_reply (parent_id, comment_id, parent, comment, subreddit, unix, score) VALUES ("{}","{}","{}","{}","{}",{},{});""".format(
-            parentid, commentid, parent, comment, subreddit, int(time), score)
+        sql = """INSERT INTO parent_reply (parent_id, comment_id, parent, comment, subreddit, unix, keyword_score) VALUES ("{}","{}","{}","{}","{}","{}","{}");""".format(
+            parentid, commentid, parent, comment, subreddit, int(time), score, keywordsCount)
         transaction_bldr(sql)
     except Exception as e:
         print('s0 insertion', str(e))
 
 
-def sql_insert_no_parent(commentid, parentid, comment, subreddit, time, score):
+def sql_insert_no_parent(commentid, parentid, comment, subreddit, time, score, keywordsCount):
     try:
-        sql = """INSERT INTO parent_reply (parent_id, comment_id, comment, subreddit, unix, score) VALUES ("{}","{}","{}","{}",{},{});""".format(
-            parentid, commentid, comment, subreddit, int(time), score)
+        sql = """INSERT INTO parent_reply (parent_id, comment_id, comment, subreddit, unix, score, keyword_score) VALUES ("{}","{}","{}","{}","{}","{}","{}");""".format(
+            parentid, commentid, comment, subreddit, int(time), score, keywordsCount)
         transaction_bldr(sql)
     except Exception as e:
         print('s0 insertion', str(e))
@@ -95,18 +98,17 @@ def acceptable(data):
         return True
 
 
+def clean(txt):
+    txt = txt.replace(' newlinechar ', '')
+    return txt
 
-def contains_keywords(body):
+
+def keywords_count(txt):
+    counter = 0
     for w in keywords:
-        if w in body:
-            keyword_counterNew = keyword_counterNew + 1
-        else:
-            continue
-
-    if keyword_counterNew > 0:
-            return True
-    else:
-            return False
+        if w.lower() in txt:
+            counter = counter + 1
+    return counter
 
 
 def find_parent(pid):
@@ -136,6 +138,19 @@ def find_existing_score(pid):
         # print(str(e))
         return False
 
+def find_existing_keyword_score(pid):
+    try:
+        sql = "SELECT keyword_score FROM parent_reply WHERE parent_id = '{}' LIMIT 1".format(pid)
+        c.execute(sql)
+        result = c.fetchone()
+        if result != None:
+            return result[0]
+        else:
+            return False
+    except Exception as e:
+        # print(str(e))
+        return False
+
 
 if __name__ == '__main__':
     create_table()
@@ -143,7 +158,7 @@ if __name__ == '__main__':
     paired_rows = 0
 
     # with open('D:/Téléchargements/{}/RC_{}'.format(timeframe.split('-')[0],timeframe), buffering=1000) as f:
-    with open('D:/Téléchargements/RC_{}'.format(timeframe, timeframe), buffering=1000) as f:
+    with open('D:/Final project/RC_{}'.format(timeframe, timeframe), buffering=1000) as f:
         for row in f:
             # print(row)
             # time.sleep(555)
@@ -160,26 +175,33 @@ if __name__ == '__main__':
                     comment_id = row['id']
 
                     subreddit = row['subreddit']
+
+                    cleanedBody = clean(body)
+                    keywordsCount = keywords_count(cleanedBody)
+
                     parent_data = find_parent(parent_id)
 
                     #This first block looks to see if an existing comment exist, and replaces it if the current row has a higher score
-                    existing_comment_score = find_existing_score(parent_id)
-                    if existing_comment_score: #false if no existing comment exists
-                        if score > existing_comment_score:
-                            if acceptable(body):
-                                sql_insert_replace_comment(comment_id, parent_id, parent_data, body, subreddit,
-                                                           created_utc, score)
 
-                    #If no particular existing comment exists, we insert new comment
-                    else:
-                        if acceptable(body) and contains_keywords(body):
-                            if parent_data: #if comment has a parent that it is replying to
-                                #if score >= 2: #This is the comment score threshold - designed to filter only good comments - won't be used as we need to maximise our comment number
-                                    sql_insert_has_parent(comment_id, parent_id, parent_data, body, subreddit,
-                                                          created_utc, score)
-                                    paired_rows += 1
-                            else: #comment is inserted with no parent
-                                sql_insert_no_parent(comment_id, parent_id, body, subreddit, created_utc, score)
+                    if keywordsCount > 0:
+                        existing_comment_score = find_existing_score(parent_id)
+                        existing_keyword_score = find_existing_keyword_score(parent_id)
+                        if existing_comment_score: #false if no existing comment exists
+                            if score > existing_comment_score or keywordsCount > existing_keyword_score:
+                                if acceptable(body):
+                                    sql_insert_replace_comment(comment_id, parent_id, parent_data, body, subreddit,
+                                                               created_utc, score, keywordsCount)
+
+                        #If no particular existing comment exists, we insert new comment
+                        else:
+                            if acceptable(body):
+                                if parent_data: #if comment has a parent that it is replying to
+                                    #if score >= 2: #This is the comment score threshold - designed to filter only good comments - won't be used as we need to maximise our comment number
+                                        sql_insert_has_parent(comment_id, parent_id, parent_data, body, subreddit,
+                                                              created_utc, score, keywordsCount)
+                                        paired_rows += 1
+                                else: #comment is inserted with no parent
+                                    sql_insert_no_parent(comment_id, parent_id, body, subreddit, created_utc, score, keywordsCount)
                 except Exception as e:
                     print(str(e))
 
