@@ -27,7 +27,7 @@ c = connection.cursor()
 keywords = ['how are you?', 'how’s it going?', 'how are you doing?', 'what’s up?', 'what’s new?'
             'what’s going on?',
             ' atmosphere', ' clear sky', ' climate', ' cold', ' cyclone', ' fog',
-            ' humidity', ' humid', ' precipitation', ' prevailing wind', 'rain ', ' rainfall', ' summer', ' winter', ' autumn', 'spring', 'seasonality',
+            ' humidity', ' humid', ' precipitation', ' prevailing wind', ' rain ', ' rainfall', ' summer', ' winter', ' autumn', 'spring', 'seasonality',
             'smog ', ' sunny', ' snow', ' snowflakes', ' snowflakes', ' snowstorm ', ' temperature', ' temperature range', ' warm front', ' warm sector',
             ' warmer', ' weather', ' wind ', ' windy ', 'drizzle', 'downpour', 'freezing', 'cloudy', 'overcast', 'hurricane', ' drought', 'thunder', 'met office',
             'meteorology', 'rainstorm', 'cloudless', 'tsunami', 'tornado']
@@ -58,10 +58,10 @@ def transaction_bldr(sql):
         sql_transaction = []
 
 
-def sql_insert_replace_comment(commentid, parentid, parent, comment, subreddit, time, score, keyword_score):
+def sql_insert_replace_comment(commentid, parentid, parent, comment, subreddit, time, score, keywordsCount):
     try:
         sql = """UPDATE parent_reply SET parent_id = ?, comment_id = ?, parent = ?, comment = ?, subreddit = ?, unix = ?, score = ?, keyword_score = ?, WHERE parent_id =?;""".format(
-            parentid, commentid, parent, comment, subreddit, int(time), score, keyword_score, parentid)
+            parentid, commentid, parent, comment, subreddit, int(time), score, keywordsCount, parentid)
         transaction_bldr(sql)
     except Exception as e:
         print('s0 insertion', str(e))
@@ -69,7 +69,7 @@ def sql_insert_replace_comment(commentid, parentid, parent, comment, subreddit, 
 
 def sql_insert_has_parent(commentid, parentid, parent, comment, subreddit, time, score, keywordsCount):
     try:
-        sql = """INSERT INTO parent_reply (parent_id, comment_id, parent, comment, subreddit, unix, keyword_score) VALUES ("{}","{}","{}","{}","{}","{}","{}");""".format(
+        sql = """INSERT INTO parent_reply (parent_id, comment_id, parent, comment, subreddit, unix, score, keyword_score) VALUES ("{}","{}","{}","{}","{}","{}","{}","{}");""".format(
             parentid, commentid, parent, comment, subreddit, int(time), score, keywordsCount)
         transaction_bldr(sql)
     except Exception as e:
@@ -97,11 +97,12 @@ def acceptable(data):
     else:
         return True
 
-
 def clean(txt):
-    txt = txt.replace(' newlinechar ', '')
-    return txt
-
+    prohibitedWords = [" newlinechar ", "&gt;", "&amp;"]
+    result = txt
+    for word in prohibitedWords:
+        result = result.replace(word, "")
+    return result
 
 def keywords_count(txt):
     counter = 0
@@ -189,7 +190,7 @@ if __name__ == '__main__':
                         if existing_comment_score: #false if no existing comment exists
                             if score > existing_comment_score or keywordsCount > existing_keyword_score:
                                 if acceptable(body):
-                                    sql_insert_replace_comment(comment_id, parent_id, parent_data, body, subreddit,
+                                    sql_insert_replace_comment(comment_id, parent_id, parent_data, cleanedBody, subreddit,
                                                                created_utc, score, keywordsCount)
 
                         #If no particular existing comment exists, we insert new comment
@@ -197,11 +198,11 @@ if __name__ == '__main__':
                             if acceptable(body):
                                 if parent_data: #if comment has a parent that it is replying to
                                     #if score >= 2: #This is the comment score threshold - designed to filter only good comments - won't be used as we need to maximise our comment number
-                                        sql_insert_has_parent(comment_id, parent_id, parent_data, body, subreddit,
+                                        sql_insert_has_parent(comment_id, parent_id, parent_data, cleanedBody, subreddit,
                                                               created_utc, score, keywordsCount)
                                         paired_rows += 1
                                 else: #comment is inserted with no parent
-                                    sql_insert_no_parent(comment_id, parent_id, body, subreddit, created_utc, score, keywordsCount)
+                                    sql_insert_no_parent(comment_id, parent_id, cleanedBody, subreddit, created_utc, score, keywordsCount)
                 except Exception as e:
                     print(str(e))
 
