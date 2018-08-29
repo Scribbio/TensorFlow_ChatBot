@@ -6,15 +6,15 @@ import json
 from datetime import datetime
 import time
 
-timeframe = '2018-05'
+timeframe = '2018-06'
 sql_transaction = []
 start_row = 0
-cleanup = 100000
+cleanup = 5000000
 
 # keyword_counterNew = 0
 # keyword_counterOld = 0
 
-connection = sqlite3.connect('{}.db'.format(timeframe))
+connection = sqlite3.connect('{}.db'.format('2018-06'))
 c = connection.cursor()
 
 #
@@ -24,13 +24,24 @@ c = connection.cursor()
 #             'welcome', 'how have you been?', 'yo!', 'are you OK?', 'you alright?', 'alright mate?', 'howdy!', 'sup?',
 #             'whazzup?', 'whassup', 'what’s up', 'hiya!', ,
 
-keywords = ['how are you?', 'how’s it going?', 'how are you doing?', 'what’s up?', 'what’s new?'
-            'what’s going on?',
-            ' atmosphere', ' clear sky', ' climate', ' cold', ' cyclone', ' fog',
-            ' humidity', ' humid', ' precipitation', ' prevailing wind', ' rain ', ' rainfall', ' summer', ' winter', ' autumn', 'spring', 'seasonality',
-            'smog ', ' sunny', ' snow', ' snowflakes', ' snowflakes', ' snowstorm ', ' temperature', ' temperature range', ' warm front', ' warm sector',
-            ' warmer', ' weather', ' wind ', ' windy ', 'drizzle', 'downpour', 'freezing', 'cloudy', 'overcast', 'hurricane', ' drought', 'thunder', 'met office',
-            'meteorology', 'rainstorm', 'cloudless', 'tsunami', 'tornado']
+# keywords = ['how are you?', 'how’s it going?', 'how are you doing?', 'what’s up?', 'what’s new?'
+#             'what’s going on?',
+#             ' atmosphere', ' clear sky', ' climate', ' cold', ' cyclone', ' fog',
+#             ' humidity', ' humid', ' precipitation', ' prevailing wind', ' rain ', ' rainfall', ' summer', ' winter', ' autumn', 'spring', 'seasonality',
+#             'smog ', ' sunny', ' snow', ' snowflakes', ' snowflakes', ' snowstorm ', ' temperature', ' temperature range', ' warm front', ' warm sector',
+#             ' warmer', ' weather', ' wind ', ' windy ', 'drizzle', 'downpour', 'freezing', 'cloudy', 'overcast', 'hurricane', ' drought', 'thunder', 'met office',
+#             'meteorology', 'rainstorm', 'cloudless', 'tsunami', 'tornado']
+
+keywords = ['people', 'friend', 'time', 'something', 'work', 'help', 'feel', 'life', 'tell', 'now', 'someone', 'take',
+            'good', 'sure', 'much', 'person', 'look', 'sound', 'probably', 'job', 'right', 'anything', 'parent', 'never',
+            'give', 'relationship', 'always', 'ask', 'said', 'thanks', 'talk', 'better', 'find', 'actually', 'best',
+            'love', 'problem', 'situation', 'girl', 'feeling', 'family', 'point', 'kid', 'start', 'trying', 'live',
+            'year', 'thought', 'kind', 'around', 'place', 'hard', 'little', 'end', 'understand', 'school', 'bad',
+            'reason', 'everyone', 'issue', 'money', 'everything', 'already', 'nothing', 'change', 'leave', 'stop',
+            'sometime', 'mom', 'able', 'experience', 'care', 'believe', 'enough', 'advice', 'anyone', 'happy', 'sorry',
+            'other', 'Good luck', 'mind', 'another', 'matter', 'college', 'two', 'great', 'without',  'saying', 'happen',
+            'call', 'part', 'told', 'seems', 'home' 'us', 'around']
+
 
 def create_table():
     c.execute(
@@ -97,12 +108,12 @@ def acceptable(data):
     else:
         return True
 
-def clean(txt):
-    prohibitedWords = [" newlinechar ", "&gt;", "&amp;"]
-    result = txt
-    for word in prohibitedWords:
-        result = result.replace(word, "")
-    return result
+#def clean(txt):
+   # prohibitedWords = [" newlinechar ", "&gt;", "&amp;"]
+   # result = txt
+   # for word in prohibitedWords:
+   #     result = result.replace(word, "")
+   # return result
 
 def keywords_count(txt):
     counter = 0
@@ -177,8 +188,8 @@ if __name__ == '__main__':
 
                     subreddit = row['subreddit']
 
-                    cleanedBody = clean(body)
-                    keywordsCount = keywords_count(cleanedBody)
+
+                    keywordsCount = keywords_count(body)
 
                     parent_data = find_parent(parent_id)
 
@@ -190,7 +201,7 @@ if __name__ == '__main__':
                         if existing_comment_score: #false if no existing comment exists
                             if score > existing_comment_score or keywordsCount > existing_keyword_score:
                                 if acceptable(body):
-                                    sql_insert_replace_comment(comment_id, parent_id, parent_data, cleanedBody, subreddit,
+                                    sql_insert_replace_comment(comment_id, parent_id, parent_data, body, subreddit,
                                                                created_utc, score, keywordsCount)
 
                         #If no particular existing comment exists, we insert new comment
@@ -198,11 +209,11 @@ if __name__ == '__main__':
                             if acceptable(body):
                                 if parent_data: #if comment has a parent that it is replying to
                                     #if score >= 2: #This is the comment score threshold - designed to filter only good comments - won't be used as we need to maximise our comment number
-                                        sql_insert_has_parent(comment_id, parent_id, parent_data, cleanedBody, subreddit,
+                                        sql_insert_has_parent(comment_id, parent_id, parent_data, body, subreddit,
                                                               created_utc, score, keywordsCount)
                                         paired_rows += 1
                                 else: #comment is inserted with no parent
-                                    sql_insert_no_parent(comment_id, parent_id, cleanedBody, subreddit, created_utc, score, keywordsCount)
+                                    sql_insert_no_parent(comment_id, parent_id, body, subreddit, created_utc, score, keywordsCount)
                 except Exception as e:
                     print(str(e))
 
